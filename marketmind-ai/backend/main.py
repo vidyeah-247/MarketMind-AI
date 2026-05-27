@@ -1,3 +1,4 @@
+from apscheduler.schedulers.background import BackgroundScheduler
 from database import engine, SessionLocal, Base
 from models import MarketPrice
 from fastapi import FastAPI
@@ -27,9 +28,7 @@ COINS = {
 @app.get("/")
 def home():
     return {"message": "MarketMind AI Backend is running"}
-@app.get("/prices")
-@app.get("/prices")
-def get_prices():
+def fetch_and_store_prices():
     db = SessionLocal()
     coin_ids = ",".join(COINS.values())
     url = "https://api.coingecko.com/api/v3/simple/price"
@@ -42,7 +41,6 @@ def get_prices():
     }
     response = requests.get(url, params=params, timeout=10)
     data = response.json()
-    result = []
     for symbol, coin_id in COINS.items():
         coin_data = data.get(coin_id, {})
         market_entry = MarketPrice(
@@ -53,13 +51,64 @@ def get_prices():
             market_cap=coin_data.get("usd_market_cap", 0),
         )
         db.add(market_entry)
-        result.append({
-            "symbol": symbol,
-            "price_usd": coin_data.get("usd"),
-            "change_24h": round(coin_data.get("usd_24h_change", 0), 2),
-            "volume_24h": round(coin_data.get("usd_24h_vol", 0), 2),
-            "market_cap": round(coin_data.get("usd_market_cap", 0), 2),
-        })
     db.commit()
     db.close()
+    print("Market prices stored successfully")
+@app.get("/prices")
+def get_prices():
+
+    db = SessionLocal()
+
+    latest_prices = db.query(MarketPrice)\
+        .order_by(MarketPrice.timestamp.desc())\
+        .limit(20)\
+        .all()
+
+    db.close()
+
+    result = []
+
+    for item in latest_prices:
+
+        result.append({
+            "symbol": item.symbol,
+            "price_usd": item.price_usd,
+            "change_24h": item.change_24h,
+            "volume_24h": item.volume_24h,
+            "market_cap": item.market_cap,
+            "timestamp": item.timestamp
+        })
+
+    return result
+scheduler = BackgroundScheduler()
+scheduler.add_job(
+    fetch_and_store_prices,
+    'interval',
+    seconds=30
+)
+scheduler.start()
+@app.get("/history/{symbol}")
+def get_price_history(symbol: str):
+    db = SessionLocal()
+
+    prices = db.query(MarketPrice)\
+        .filter(MarketPrice.symbol == symbol.upper())\
+        .order_by(MarketPrice.timestamp.desc())\
+        .limit(100)\
+        .all()
+
+    db.close()
+
+    result = []
+
+    for item in reversed(prices):
+        result.append({
+            "symbol": item.symbol,
+            "price_usd": item.price_usd,
+            "change_24h": item.change_24h,
+            "volume_24h": item.volume_24h,
+            "market_cap": item.market_cap,
+            "timestamp": item.timestamp
+        })
+
     return result
