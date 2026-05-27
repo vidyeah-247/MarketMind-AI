@@ -10,3 +10,14 @@ class MarketPrice(Base):
     volume_24h = Column(Float)
     market_cap = Column(Float)
     timestamp = Column(DateTime, default=datetime.utcnow)
+class NewsArticle(Base):
+    __tablename__ = "news_articles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String)
+    source = Column(String)
+    url = Column(String, unique=True)
+    sentiment = Column(String)
+    sentiment_score = Column(Float)
+    published_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)

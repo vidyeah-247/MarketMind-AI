@@ -19,11 +19,33 @@ type Price = {
   timestamp: string;
 };
 
-const API_URL = "https://organic-space-system-69r4gq7p7449c4j56-8000.app.github.dev";
+type NewsArticle = {
+  title: string;
+  source: string;
+  url: string;
+  sentiment: string;
+  sentiment_score: number;
+  published_at: string;
+  created_at?: string;
+};
+
+type MarketSummary = {
+  overall_sentiment: string;
+  summary: string;
+  positive_news: number;
+  negative_news: number;
+  neutral_news: number;
+  total_articles: number;
+};
+
+const API_URL =
+  "https://organic-space-system-69r4gq7p7449c4j56-8000.app.github.dev";
 
 export default function Home() {
   const [prices, setPrices] = useState<Price[]>([]);
   const [history, setHistory] = useState<Price[]>([]);
+  const [news, setNews] = useState<NewsArticle[]>([]);
+  const [summary, setSummary] = useState<MarketSummary | null>(null);
   const [selectedCoin, setSelectedCoin] = useState("BTC");
   const [loading, setLoading] = useState(true);
 
@@ -31,13 +53,7 @@ export default function Home() {
     try {
       const res = await fetch(`${API_URL}/prices`);
       const data = await res.json();
-
-      if (Array.isArray(data)) {
-        setPrices(data);
-      } else {
-        console.error("Prices API did not return array:", data);
-        setPrices([]);
-      }
+      setPrices(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching prices:", error);
       setPrices([]);
@@ -48,16 +64,32 @@ export default function Home() {
     try {
       const res = await fetch(`${API_URL}/history/${symbol}`);
       const data = await res.json();
-
-      if (Array.isArray(data)) {
-        setHistory(data);
-      } else {
-        console.error("History API did not return array:", data);
-        setHistory([]);
-      }
+      setHistory(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching history:", error);
       setHistory([]);
+    }
+  }
+
+  async function fetchNews() {
+    try {
+      const res = await fetch(`${API_URL}/news`);
+      const data = await res.json();
+      setNews(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Error fetching news:", error);
+      setNews([]);
+    }
+  }
+
+  async function fetchSummary() {
+    try {
+      const res = await fetch(`${API_URL}/summary`);
+      const data = await res.json();
+      setSummary(data);
+    } catch (error) {
+      console.error("Error fetching summary:", error);
+      setSummary(null);
     }
   }
 
@@ -66,6 +98,8 @@ export default function Home() {
       setLoading(true);
       await fetchPrices();
       await fetchHistory(selectedCoin);
+      await fetchNews();
+      await fetchSummary();
       setLoading(false);
     }
 
@@ -74,6 +108,8 @@ export default function Home() {
     const interval = setInterval(() => {
       fetchPrices();
       fetchHistory(selectedCoin);
+      fetchNews();
+      fetchSummary();
     }, 10000);
 
     return () => clearInterval(interval);
@@ -87,21 +123,56 @@ export default function Home() {
         Real-time crypto market intelligence dashboard
       </p>
 
-      {loading && (
-        <p className="text-yellow-400 mb-4">
-          Loading market data...
-        </p>
-      )}
+      {loading && <p className="text-yellow-400 mb-4">Loading market data...</p>}
 
-      {!loading && prices.length === 0 && (
-        <div className="rounded-xl border border-red-800 bg-red-950 p-4 mb-6">
-          <p className="text-red-300 font-semibold">
-            No price data found.
-          </p>
-          <p className="text-red-200 text-sm mt-1">
-            Check that your backend is running and API_URL is correct.
-          </p>
-        </div>
+      {summary && (
+        <section className="mb-8 rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold">AI Market Summary</h2>
+
+            <span
+              className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                summary.overall_sentiment === "Bullish"
+                  ? "bg-green-900 text-green-300"
+                  : summary.overall_sentiment === "Bearish"
+                  ? "bg-red-900 text-red-300"
+                  : "bg-zinc-800 text-zinc-300"
+              }`}
+            >
+              {summary.overall_sentiment}
+            </span>
+          </div>
+
+          <p className="text-gray-300 leading-7 mb-6">{summary.summary}</p>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="rounded-xl bg-zinc-900 p-4">
+              <p className="text-sm text-gray-400">Positive</p>
+              <p className="text-2xl font-bold text-green-400">
+                {summary.positive_news}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-zinc-900 p-4">
+              <p className="text-sm text-gray-400">Negative</p>
+              <p className="text-2xl font-bold text-red-400">
+                {summary.negative_news}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-zinc-900 p-4">
+              <p className="text-sm text-gray-400">Neutral</p>
+              <p className="text-2xl font-bold text-gray-300">
+                {summary.neutral_news}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-zinc-900 p-4">
+              <p className="text-sm text-gray-400">Articles</p>
+              <p className="text-2xl font-bold">{summary.total_articles}</p>
+            </div>
+          </div>
+        </section>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
@@ -163,6 +234,50 @@ export default function Home() {
                 />
               </LineChart>
             </ResponsiveContainer>
+          </div>
+        )}
+      </section>
+
+      <section className="mt-8 rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
+        <h2 className="text-2xl font-bold mb-6">Latest Crypto News</h2>
+
+        {news.length === 0 ? (
+          <p className="text-gray-400">
+            No news data yet. Check backend `/news` endpoint.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {news.map((article, index) => (
+              <a
+                key={`${article.url}-${index}`}
+                href={article.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block rounded-xl border border-zinc-800 p-4 hover:bg-zinc-900 transition"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm text-gray-400">{article.source}</p>
+
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full ${
+                      article.sentiment === "positive"
+                        ? "bg-green-900 text-green-300"
+                        : article.sentiment === "negative"
+                        ? "bg-red-900 text-red-300"
+                        : "bg-zinc-800 text-zinc-300"
+                    }`}
+                  >
+                    {article.sentiment}
+                  </span>
+                </div>
+
+                <h3 className="font-semibold text-lg">{article.title}</h3>
+
+                <p className="text-xs text-gray-500 mt-2">
+                  Sentiment score: {article.sentiment_score}
+                </p>
+              </a>
+            ))}
           </div>
         )}
       </section>
