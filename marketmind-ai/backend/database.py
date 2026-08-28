@@ -1,6 +1,9 @@
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
-DATABASE_URL = "postgresql://marketuser:password123@127.0.0.1:5433/marketmind"
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL environment variable is not set")
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(
     autocommit=False,
